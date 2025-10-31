@@ -5,13 +5,15 @@ import {
   onBoarded,
   signUp,
   verifyOtp,
+  resendOtp,
 } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 router.post("/signup", signUp);
-router.post('/verify-otp',verifyOtp);
+router.post("/verify-otp", verifyOtp);
+router.post("/resend-otp", resendOtp);
 router.post("/login", logIn);
 router.post("/logout", logout);
 router.post("/onboarding", protectRoute, onBoarded);

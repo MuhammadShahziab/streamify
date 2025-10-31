@@ -1,14 +1,140 @@
+import bcrypt from "bcryptjs";
+
 import { upsertStreamUser } from "../lib/stream.js";
 import Otp from "../models/Otp.js";
 import User from "../models/User.js";
-import jwt from "jsonwebtoken";
+import { clearAuthCookie, createAuthToken, setAuthCookie } from "../utils/authTokens.js";
 import { sendEmail } from "../utils/email.js";
-import bcrypt from "bcryptjs";
 import { generateOtp } from "../utils/generateOtp.js";
+
+const OTP_EXPIRY_MINUTES = Number(process.env.OTP_TTL_MINUTES || 2);
+const OTP_EXPIRY_MS = OTP_EXPIRY_MINUTES * 60 * 1000;
+const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
+const OTP_RESEND_INTERVAL_SECONDS = Number(process.env.OTP_RESEND_INTERVAL_SECONDS || 60);
+
+class OtpRateLimitError extends Error {
+  constructor(message, { retryAt, meta }) {
+    super(message);
+    this.name = "OtpRateLimitError";
+    this.retryAt = retryAt;
+    this.meta = meta;
+  }
+}
+
+const normalizeEmail = (email = "") => email.trim().toLowerCase();
+
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const plainUser = user.toObject ? user.toObject() : { ...user };
+  delete plainUser.password;
+  return plainUser;
+};
+
+const buildVerificationMeta = (expiresAt, attempts = 0, extra = {}) => ({
+  expiresAt,
+  maxAttempts: OTP_MAX_ATTEMPTS,
+  attemptsRemaining: Math.max(OTP_MAX_ATTEMPTS - attempts, 0),
+  expiresInMinutes: OTP_EXPIRY_MINUTES,
+  resendIntervalSeconds: OTP_RESEND_INTERVAL_SECONDS,
+  ...extra,
+});
+
+const calculateResendAvailableAt = (otpRecord) => {
+  if (!otpRecord?.createdAt) return null;
+  return new Date(
+    otpRecord.createdAt.getTime() + OTP_RESEND_INTERVAL_SECONDS * 1000
+  );
+};
+
+const sendVerificationEmail = async ({ email, otp }) => {
+  await sendEmail(
+    email,
+    "Your Streamify Verification Code",
+    `<h3>Welcome to Streamify 🎉</h3><p>Your verification code is:</p><h2>${otp}</h2><p>This code is valid for ${OTP_EXPIRY_MINUTES} minute${
+      OTP_EXPIRY_MINUTES === 1 ? "" : "s"
+    }.</p>`
+  );
+};
+
+const issueOtpForUser = async (user, options = {}) => {
+  const { allowRateBypass = false } = options;
+
+  const existingOtp = await Otp.findOne({ email: user.email }).sort({
+    createdAt: -1,
+  });
+
+  if (!allowRateBypass && existingOtp) {
+    const resendAvailableAt = calculateResendAvailableAt(existingOtp);
+    if (resendAvailableAt && resendAvailableAt > new Date()) {
+      throw new OtpRateLimitError("Please wait before requesting another code.", {
+        retryAt: resendAvailableAt,
+        meta: {
+          verification: buildVerificationMeta(
+            existingOtp.expiresAt,
+            existingOtp.attempts,
+            { resendAvailableAt }
+          ),
+        },
+      });
+    }
+  }
+
+  const otp = generateOtp();
+  const hashedOtp = await bcrypt.hash(otp, 10);
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+
+  await Otp.deleteMany({ email: user.email });
+  await Otp.create({
+    email: user.email,
+    otpHash: hashedOtp,
+    expiresAt,
+    attempts: 0,
+  });
+
+  await sendVerificationEmail({ email: user.email, otp });
+
+  const resendAvailableAt = new Date(
+    Date.now() + OTP_RESEND_INTERVAL_SECONDS * 1000
+  );
+  return buildVerificationMeta(expiresAt, 0, { resendAvailableAt });
+};
+
+const respondWithVerification = (res, statusCode, payload) => {
+  const responseBody = {
+    success: false,
+    ...payload,
+  };
+
+  if (!responseBody.expiresAt && payload?.meta?.verification?.expiresAt) {
+    responseBody.expiresAt = payload.meta.verification.expiresAt;
+  }
+
+  if (!responseBody.retryAt && payload?.retryAt) {
+    responseBody.retryAt = payload.retryAt;
+  }
+
+  if (
+    !responseBody.retryAt &&
+    payload?.meta?.verification?.resendAvailableAt
+  ) {
+    responseBody.retryAt = payload.meta.verification.resendAvailableAt;
+  }
+
+  return res.status(statusCode).json(responseBody);
+};
+
+const handleOtpRateLimit = (res, error) =>
+  respondWithVerification(res, 429, {
+    code: "OTP_RATE_LIMITED",
+    message: error.message,
+    retryAt: error.retryAt,
+    ...(error.meta || {}),
+  });
 
 export const signUp = async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
+
     if (!fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -24,24 +150,8 @@ export const signUp = async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    const existingUser = await User.findOne({ email });
-
-    const sendOtpToUser = async (user) => {
-      const otp = generateOtp(); // 4-digit string
-      const hashedOtp = await bcrypt.hash(otp, 10);
-      const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 mins ahead
-
-      await Otp.deleteMany({ email });
-      await Otp.create({ email, otpHash: hashedOtp, expiresAt });
-
-      await sendEmail(
-        email,
-        "Your Streamify Verification Code",
-        `<h3>Welcome to Streamify 🎉</h3><p>Your verification code is:</p><h2>${otp}</h2><p>This code is valid until ${expiresAt.toLocaleTimeString()}.</p>`
-      );
-
-      return { user, expiresAt };
-    };
+    const normalizedEmail = normalizeEmail(email);
+    const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
       if (existingUser.isVerified) {
@@ -50,22 +160,30 @@ export const signUp = async (req, res) => {
           .json({ message: "User already exists and is verified" });
       }
 
-      const result = await sendOtpToUser(existingUser);
-      return res.status(200).json({
-        success: true,
-        message: "User already registered but not verified. OTP resent.",
-        user: result.user,
-        expiresAt: result.expiresAt,
-      });
+      try {
+        const verificationMeta = await issueOtpForUser(existingUser);
+        return res.status(200).json({
+          success: true,
+          message:
+            "User already registered but not verified. Verification code resent.",
+          user: sanitizeUser(existingUser),
+          expiresAt: verificationMeta.expiresAt,
+          meta: { verification: verificationMeta },
+        });
+      } catch (error) {
+        if (error instanceof OtpRateLimitError) {
+          return handleOtpRateLimit(res, error);
+        }
+        throw error;
+      }
     }
 
-    // Create new user
     const idx = Math.floor(Math.random() * 100) + 1;
     const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
 
     const newUser = await User.create({
-      fullName,
-      email,
+      fullName: fullName.trim(),
+      email: normalizedEmail,
       password,
       profilePic: randomAvatar,
     });
@@ -76,70 +194,140 @@ export const signUp = async (req, res) => {
       image: newUser.profilePic || "",
     });
 
-    const result = await sendOtpToUser(newUser);
+    try {
+      const verificationMeta = await issueOtpForUser(newUser, {
+        allowRateBypass: true,
+      });
 
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      user: result.user,
-      expiresAt: result.expiresAt,
-    });
+      return res.status(201).json({
+        success: true,
+        message: "User created successfully. Please verify your email.",
+        user: sanitizeUser(newUser),
+        expiresAt: verificationMeta.expiresAt,
+        meta: { verification: verificationMeta },
+      });
+    } catch (error) {
+      if (error instanceof OtpRateLimitError) {
+        return handleOtpRateLimit(res, error);
+      }
+      throw error;
+    }
   } catch (error) {
     console.error("Error in signup controller", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// verify otp controller
 export const verifyOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
+
     if (!email || !otp) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const otpRecord = await Otp.findOne({ email });
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedOtp = String(otp).trim();
+
+    if (!normalizedOtp) {
+      return res.status(400).json({ code: "OTP_INVALID", message: "Invalid OTP" });
+    }
+
+    const otpRecord = await Otp.findOne({ email: normalizedEmail });
+
     if (!otpRecord) {
-      return res.status(400).json({ message: "OTP has expired or is invalid" });
+      return res.status(400).json({
+        code: "OTP_NOT_FOUND",
+        message: "OTP has expired or is invalid",
+      });
     }
 
-    // ⏰ Manual expiration check
+    const resendAvailableAt = calculateResendAvailableAt(otpRecord);
+
     if (otpRecord.expiresAt < new Date()) {
-      await Otp.deleteMany({ email }); // clean up
-      return res.status(400).json({ message: "OTP has expired" });
+      await Otp.deleteMany({ email: normalizedEmail });
+      return res.status(400).json({
+        code: "OTP_EXPIRED",
+        message: "OTP has expired",
+        meta: {
+          verification: buildVerificationMeta(
+            otpRecord.expiresAt,
+            OTP_MAX_ATTEMPTS,
+            { resendAvailableAt }
+          ),
+        },
+      });
     }
 
-    const isValidOtp = await bcrypt.compare(otp.trim(), otpRecord.otpHash);
+    if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
+      await Otp.deleteMany({ email: normalizedEmail });
+      return res.status(429).json({
+        code: "OTP_MAX_ATTEMPTS",
+        message: "Too many invalid attempts. Please request a new OTP.",
+        meta: {
+          verification: buildVerificationMeta(
+            otpRecord.expiresAt,
+            OTP_MAX_ATTEMPTS,
+            { resendAvailableAt }
+          ),
+        },
+      });
+    }
+
+    const isValidOtp = await bcrypt.compare(normalizedOtp, otpRecord.otpHash);
+
     if (!isValidOtp) {
-      return res.status(400).json({ message: "Invalid OTP" });
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+
+      if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
+        await Otp.deleteMany({ email: normalizedEmail });
+        return res.status(429).json({
+          code: "OTP_MAX_ATTEMPTS",
+          message: "Too many invalid attempts. Please request a new OTP.",
+          meta: {
+            verification: buildVerificationMeta(
+              otpRecord.expiresAt,
+              otpRecord.attempts,
+              { resendAvailableAt }
+            ),
+          },
+        });
+      }
+
+      return res.status(400).json({
+        code: "OTP_INVALID",
+        message: "Invalid OTP",
+        meta: {
+          verification: buildVerificationMeta(
+            otpRecord.expiresAt,
+            otpRecord.attempts,
+            { resendAvailableAt }
+          ),
+        },
+      });
     }
 
-    // ✅ Mark user as verified
     const user = await User.findOneAndUpdate(
-      { email },
+      { email: normalizedEmail },
       { isVerified: true },
       { new: true }
     );
+
     if (!user) {
+      await Otp.deleteMany({ email: normalizedEmail });
       return res.status(404).json({ message: "User not found" });
     }
 
-    await Otp.deleteMany({ email }); // delete used OTP
+    await Otp.deleteMany({ email: normalizedEmail });
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.cookie("jwt", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    const token = createAuthToken(user._id);
+    setAuthCookie(res, token);
 
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully",
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("Error in verifyOtp:", error);
@@ -147,35 +335,92 @@ export const verifyOtp = async (req, res) => {
   }
 };
 
+export const resendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user || user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "If the account requires verification, we have sent a new code.",
+        expiresAt: null,
+        meta: { verification: null },
+      });
+    }
+
+    try {
+      const verificationMeta = await issueOtpForUser(user);
+      return res.status(200).json({
+        success: true,
+        message: "Verification code resent.",
+        expiresAt: verificationMeta.expiresAt,
+        meta: { verification: verificationMeta },
+      });
+    } catch (error) {
+      if (error instanceof OtpRateLimitError) {
+        return handleOtpRateLimit(res, error);
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error in resendOtp:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const logIn = async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.findOne({ email: normalizedEmail });
+
     if (!user) {
       return res.status(400).json({ message: "Invalid Email or Password" });
     }
-    const isMatchPasword = await user.matchPassword(password);
 
-    if (!isMatchPasword) {
+    if (!user.isVerified) {
+      try {
+        const verificationMeta = await issueOtpForUser(user);
+        return respondWithVerification(res, 403, {
+          code: "ACCOUNT_NOT_VERIFIED",
+          message:
+            "Account not verified. We have sent a new verification code to your email.",
+          meta: { verification: verificationMeta },
+        });
+      } catch (error) {
+        if (error instanceof OtpRateLimitError) {
+          return handleOtpRateLimit(res, error);
+        }
+        throw error;
+      }
+    }
+
+    const isMatchPassword = await user.matchPassword(password);
+
+    if (!isMatchPassword) {
       return res.status(400).json({ message: "Invalid Email or Password" });
     }
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-    res.cookie("jwt", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+
+    const token = createAuthToken(user._id);
+    setAuthCookie(res, token);
+
     res.status(200).json({
       success: true,
       message: "User logged in successfully",
-      user,
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.log("Error in login controller", error);
@@ -212,7 +457,13 @@ export const onBoarded = async (req, res) => {
     const updateUser = await User.findByIdAndUpdate(
       userId,
       {
-        ...req.body,
+        fullName: fullName?.trim() ?? req.user.fullName,
+        bio,
+        nativeLanguage,
+        learningLanguage,
+        country,
+        city,
+        profilePic,
         isOnBoarded: true,
       },
       { new: true }
@@ -233,14 +484,17 @@ export const onBoarded = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      user: updateUser,
+      user: sanitizeUser(updateUser),
     });
   } catch (error) {
     console.log("Error in onBoarded controller", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 export const logout = async (req, res) => {
-  res.clearCookie("jwt");
-  res.status(200).json({ success: true, message: "Loggout successfully" });
+  clearAuthCookie(res);
+  res
+    .status(200)
+    .json({ success: true, message: "Logged out successfully" });
 };
