@@ -9,16 +9,39 @@ import OtpPage from "./pages/OtpPage";
 import { useAuthUser } from "./hooks/useAuthUser";
 import { Toaster } from "react-hot-toast";
 import Layout from "./components/Layout";
+import { useAuthStore } from "./store/useAuthStore";
+import { useThemeStore } from "./store/useThemeStore";
+import FriendsPage from "./pages/FriendsPage";
+import ChatPage from "./pages/ChatPage";
+import 'stream-chat-react/dist/css/v2/index.css';
+import CallPage from "./pages/CallPage";
 
 const App = () => {
   const { authUser, isLoading } = useAuthUser();
+  const theme = useThemeStore((t) => t.theme);
+  const pendingVerificationEmail = useAuthStore(
+    (state) => state.pendingVerificationEmail
+  );
+  const verificationMeta = useAuthStore((state) => state.verificationMeta);
+  const localUser = useAuthStore((state) => state.user);
+
   const isAuthenticated = Boolean(authUser);
   const isOnBoarded = authUser?.isOnBoarded;
+  const isVerified = authUser?.isVerified;
+
+  const hasPendingVerification =
+    (!isVerified || !isAuthenticated) &&
+    Boolean(
+      pendingVerificationEmail ||
+        verificationMeta ||
+        (localUser && localUser.isVerified === false)
+    );
+
   if (isLoading) {
     return <LoadingOverLay></LoadingOverLay>;
   }
   return (
-    <div className="h-screen" data-theme="night">
+    <div className="" data-theme={theme}>
       <Routes>
         <Route
           path="/"
@@ -70,29 +93,62 @@ const App = () => {
           path="/notifications"
           element={
             isAuthenticated && isOnBoarded ? (
-              <NotificationPage />
+              <Layout showSidebar={true}>
+                <NotificationPage />
+              </Layout>
             ) : (
               <Navigate to="/login" />
             )
           }
         ></Route>
-        {/* <Route
-          path="/verify-otp"
+        <Route
+          path="/friends"
           element={
-            isAuthenticated && !authUser?.isVerified ? (
-              <OtpPage />
+            isAuthenticated && isOnBoarded ? (
+              <Layout showSidebar={true}>
+                <FriendsPage />
+              </Layout>
             ) : (
-              <Navigate
-                to={
-                  isAuthenticated && isOnBoarded && authUser.isVerified
-                    ? "/"
-                    : "login"
-                }
-              />
+              <Navigate to="/login" />
             )
           }
-        ></Route> */}
-        <Route path="/verify-otp" element={<OtpPage />}></Route>
+        ></Route>
+        <Route
+          path="/chat/:id"
+          element={
+            isAuthenticated && isOnBoarded ? (
+              <Layout showSidebar={false}>
+                <ChatPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        ></Route>
+        <Route
+          path="/call/:id"
+          element={
+            isAuthenticated && isOnBoarded ? (
+              <Layout showSidebar={false}>
+                <CallPage />
+              </Layout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        ></Route>
+        <Route
+          path="/verify-otp"
+          element={
+            hasPendingVerification ? (
+              <OtpPage />
+            ) : isAuthenticated ? (
+              <Navigate to={isOnBoarded ? "/" : "/onboarding"} replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        ></Route>
       </Routes>
       <Toaster />
     </div>

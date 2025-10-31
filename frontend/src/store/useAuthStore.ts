@@ -1,39 +1,38 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-
-interface AuthUser {
-  _id: string;
-  fullName: string;
-  email: string;
-  profilePic?: string;
-  bio?: string;
-  nativeLanguage?: string;
-  learningLanguage?: string;
-  country?: string;
-  city?: string;
-  isOnBoarded?: boolean;
-  friends?: string[]; // Or User[] if you need full friend objects
-  isVerified: Boolean;
-}
+import type { User, VerificationEnvelope, VerificationMeta } from "../types";
 
 interface AuthState {
-  user: AuthUser | null;
-  setUser: (user: AuthUser) => void;
-  updateUser: (data: Partial<AuthUser>) => void;
-  isAuthenticated: Boolean;
-  setIsAuthenticated: (authStatus: Boolean) => void;
-  otpExpiresAt: string | null;
-  setOtpExpiresAt: (timestamp: string) => void;
-
+  user: User | null;
+  isAuthenticated: boolean;
+  verificationMeta: VerificationMeta | null;
+  verificationRetryAt: string | null;
+  pendingVerificationEmail: string | null;
+  setUser: (user: User | null) => void;
+  updateUser: (data: Partial<User>) => void;
+  setIsAuthenticated: (authStatus: boolean) => void;
+  setVerificationFromEnvelope: (payload?: VerificationEnvelope | null) => void;
+  setPendingVerificationEmail: (email: string | null) => void;
+  clearVerification: () => void;
   clearUser: () => void;
 }
+
+const extractVerificationMeta = (payload?: VerificationEnvelope | null) => {
+  const meta = payload?.meta?.verification ?? null;
+  const retryAt =
+    payload?.retryAt ?? meta?.resendAvailableAt ?? null;
+
+  return { meta, retryAt };
+};
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
       isAuthenticated: false,
-      otpExpiresAt: null,
+      verificationMeta: null,
+      verificationRetryAt: null,
+      pendingVerificationEmail: null,
 
       setUser: (user) => set({ user }),
       updateUser: (data) =>
@@ -41,12 +40,31 @@ export const useAuthStore = create<AuthState>()(
           user: state.user ? { ...state.user, ...data } : null,
         })),
       setIsAuthenticated: (authStatus) => set({ isAuthenticated: authStatus }),
-      setOtpExpiresAt: (timestamp) => set({ otpExpiresAt: timestamp }),
+      setVerificationFromEnvelope: (payload) =>
+        set(() => {
+          const { meta, retryAt } = extractVerificationMeta(payload ?? undefined);
+          return {
+            verificationMeta: meta,
+            verificationRetryAt: retryAt,
+          };
+        }),
+      setPendingVerificationEmail: (email) =>
+        set({
+          pendingVerificationEmail: email,
+        }),
+      clearVerification: () =>
+        set({
+          verificationMeta: null,
+          verificationRetryAt: null,
+          pendingVerificationEmail: null,
+        }),
       clearUser: () =>
         set({
           user: null,
           isAuthenticated: false,
-          otpExpiresAt: null,
+          verificationMeta: null,
+          verificationRetryAt: null,
+          pendingVerificationEmail: null,
         }),
     }),
     {

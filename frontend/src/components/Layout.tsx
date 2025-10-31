@@ -1,13 +1,22 @@
+import type { PropsWithChildren } from "react";
+
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
-const Layout = ({ children, showSidebar = false }) => {
+interface LayoutProps {
+  showSidebar?: boolean;
+}
+
+const Layout = ({
+  children,
+  showSidebar = false,
+}: PropsWithChildren<LayoutProps>) => {
   return (
-    <div className="h-screen">
+    <div className="h-full">
       <div className="flex">
-        {showSidebar && <Sidebar></Sidebar>}
+        {showSidebar && <Sidebar />}
         <div className="flex flex-col flex-1">
-          <Navbar></Navbar>
+          <Navbar />
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>

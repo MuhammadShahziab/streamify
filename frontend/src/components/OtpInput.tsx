@@ -101,7 +101,7 @@ const OTPInput: React.FC<OTPInputProps> = ({
   };
 
   const handlePaste = async (
-    data: string | ClipboardEvent | string[],
+    data: string | React.ClipboardEvent<HTMLInputElement> | string[],
     idx: number
   ) => {
     let paste = "";
@@ -109,7 +109,7 @@ const OTPInput: React.FC<OTPInputProps> = ({
     else if (Array.isArray(data)) paste = data.join("");
     else {
       // from onPaste event
-      const ev = data as unknown as React.ClipboardEvent<HTMLInputElement>;
+      const ev = data;
       paste = ev.clipboardData.getData("text");
       ev.preventDefault();
     }

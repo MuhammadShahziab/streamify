@@ -1,8 +1,9 @@
-import { Loader, ShipWheelIcon } from "lucide-react";
+import { ShipWheelIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { SignUpData } from "../types";
 import { useSignUp } from "../hooks/useAuthUser";
+import Button from "../components/Button";
 
 const SignupPage = () => {
   const [formData, setFormData] = useState<SignUpData>({
@@ -18,12 +19,11 @@ const SignupPage = () => {
   return (
     <div
       className="h-screen flex justify-center items-center p-4 sm:p-6 md:p-8"
-      data-theme="night"
     >
       <div className="border border-primary/25 flex flex-col lg:flex-row w-full max-w-5xl mx-auto bg-base-100 shadow-lg rounded-xl overflow-hidden">
         <div className="w-full lg:w-1/2 p-4 sm:p-6 flex flex-col">
           <div className="flex items-center gap-2  justify-start mb-4">
-            <ShipWheelIcon className="size-9 text-primary" />
+            <ShipWheelIcon className="size-9 text-primary animate-spin" />
             <span className="text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-wider">
               Streamify
             </span>
@@ -112,19 +112,16 @@ const SignupPage = () => {
                     </label>
                   </div>
                 </div>
-                <button
+                <Button
                   type="submit"
-                  className="btn btn-primary w-full rounded-full gap-x-2"
+                  variant="primary"
+                  fullWidth
+                  className="rounded-full"
+                  loading={isPending}
+                  loadingText="Creating Account..."
                 >
-                  {isPending ? (
-                    <>
-                      <Loader className="animate-spin size-4"></Loader>
-                      <span>Creating Account...</span>
-                    </>
-                  ) : (
-                    "Create Account"
-                  )}
-                </button>
+                  Create Account
+                </Button>
                 <div className="text-center">
                   <p className="text-sm">
                     Already have an account?{" "}
