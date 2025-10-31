@@ -19,9 +19,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div
-      className="flex h-screen items-center justify-center p-4 sm:p-6 md:p-8"
-    >
+    <div className="flex h-screen items-center justify-center p-4 sm:p-6 md:p-8">
       <div className="flex w-full max-w-4xl flex-col-reverse overflow-hidden rounded-xl border border-primary/25 bg-base-100 shadow-lg lg:flex-row">
         <div className="w-full p-6 sm:p-8 lg:w-1/2">
           <div className="mb-6 flex items-center gap-2">
@@ -41,10 +39,10 @@ const LoginPage = () => {
 
             <div className="space-y-4">
               <label className="form-control w-full">
-                <span className="label-text">Email</span>
+                <span className="label-text mb-2 ml-1">Email</span>
                 <input
                   type="email"
-                  className="input input-bordered w-full rounded-full"
+                  className="input input-bordered w-full max-2xl:h-11 rounded-full"
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(event) =>
@@ -58,10 +56,10 @@ const LoginPage = () => {
               </label>
 
               <label className="form-control w-full">
-                <span className="label-text">Password</span>
+                <span className="label-text mb-2 ml-1">Password</span>
                 <input
                   type="password"
-                  className="input input-bordered w-full rounded-full"
+                  className="input input-bordered w-full max-2xl:h-11 rounded-full"
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(event) =>
@@ -99,11 +97,11 @@ const LoginPage = () => {
 
         <div className="flex w-full items-center justify-center bg-primary/10 p-8 lg:w-1/2">
           <div className="max-w-md space-y-4 text-center">
-            <img
-              src="/i.png"
-              alt="Language learning illustration"
-              className="mx-auto w-64"
-            />
+              <img
+                src="/Video_call.svg"
+                alt="Language learning illustration"
+                className="mx-auto w-64"
+              />
             <h2 className="text-lg font-semibold">
               Join conversations with native speakers
             </h2>

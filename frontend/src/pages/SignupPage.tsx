@@ -31,7 +31,7 @@ const SignupPage = () => {
 
           <div className="w-full">
             <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
+              <div className="space-y-2 2xl:space-y-4">
                 <div>
                   <h2 className="text-xl font-semibold">Create an Account</h2>
                   <p className="text-sm opacity-70">
@@ -51,7 +51,7 @@ const SignupPage = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, fullName: e.target.value })
                       }
-                      className="input input-bordered rounded-full w-full"
+                      className="input input-bordered rounded-full max-2xl:h-11 w-full"
                       required
                     />
                   </div>
@@ -67,7 +67,7 @@ const SignupPage = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      className="input input-bordered rounded-full w-full"
+                      className="input input-bordered rounded-full max-2xl:h-11 w-full"
                       required
                     />
                   </div>
@@ -83,7 +83,7 @@ const SignupPage = () => {
                       onChange={(e) =>
                         setFormData({ ...formData, password: e.target.value })
                       }
-                      className="input input-bordered rounded-full w-full"
+                      className="input input-bordered rounded-full max-2xl:h-11 w-full"
                       required
                     />
                     <p className="text-xs opacity-70 mt-1">
@@ -137,9 +137,9 @@ const SignupPage = () => {
         <div className="hidden lg:flex w-1/2 bg-primary/10 items-center justify-center">
           <div className="max-w-md p-8">
             {/* Illustration */}
-            <div className="relative aspect-square max-w-sm mx-auto">
+            <div className="relative aspect-square max-w-xs 2xl:max-w-sm  mx-auto">
               <img
-                src="/i.png"
+                src="/Video_call.svg"
                 alt="Language connection illustration"
                 className="w-full h-full"
               />
