@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import type { SignUpData } from "../types";
 import { useSignUp } from "../hooks/useAuthUser";
 import Button from "../components/Button";
+import GradientText from "../components/GradientText";
 
 const SignupPage = () => {
   const [formData, setFormData] = useState<SignUpData>({
@@ -22,11 +23,8 @@ const SignupPage = () => {
     >
       <div className="border border-primary/25 flex flex-col lg:flex-row w-full max-w-5xl mx-auto bg-base-100 shadow-lg rounded-xl overflow-hidden">
         <div className="w-full lg:w-1/2 p-4 sm:p-6 flex flex-col">
-          <div className="flex items-center gap-2  justify-start mb-4">
-            <ShipWheelIcon className="size-9 text-primary animate-spin" />
-            <span className="text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-wider">
-              Streamify
-            </span>
+          <div className="flex items-center justify-start mb-4">
+            <GradientText icon={ShipWheelIcon} to="/" spin title="Streamify" />
           </div>
 
           <div className="w-full">

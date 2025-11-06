@@ -3,11 +3,14 @@ import { Link, useLocation } from "react-router";
 import { useAuthUser, useLogout } from "../hooks/useAuthUser";
 import ThemeSelector from "./ThemeSelector";
 import Button from "./Button";
+import GradientText from "./GradientText";
+import { MusicIcon } from "lucide-react";
 
 const Navbar = () => {
   const { authUser } = useAuthUser();
   const location = useLocation();
   const isChatPage = location.pathname?.startsWith("/chat");
+
   const { logoutMutation } = useLogout();
   return (
     <nav className="bg-base-200 sticky top-0 z-30 h-16 flex items-center">
@@ -16,12 +19,7 @@ const Navbar = () => {
           {/* LOGO - ONLY IN THE CHAT PAGE */}
           {isChatPage && (
             <div className="pl-5">
-              <Link to="/" className="flex items-center gap-2.5">
-                <ShipWheelIcon className="size-9 animate-spin text-primary" />
-                <span className="text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary  tracking-wider">
-                  Streamify
-                </span>
-              </Link>
+             <GradientText icon={ShipWheelIcon} to="/" spin title="Streamify" />
             </div>
           )}
 

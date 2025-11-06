@@ -1,6 +1,7 @@
 import { BellIcon, HomeIcon, ShipWheelIcon, UsersIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useAuthUser } from "../hooks/useAuthUser";
+import GradientText from "./GradientText";
 
 const Sidebar = () => {
   const { authUser } = useAuthUser();
@@ -10,12 +11,7 @@ const Sidebar = () => {
   return (
     <aside className="w-64 bg-base-200  border-base-300 hidden lg:flex flex-col h-screen sticky top-0">
       <div className="p-5 ">
-        <Link to="/" className="flex items-center gap-2.5">
-          <ShipWheelIcon className="size-9 animate-spin text-primary" />
-          <span className="text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary  tracking-wider">
-            Streamify
-          </span>
-        </Link>
+        <GradientText icon={ShipWheelIcon} to="/" spin title="Streamify" />
       </div>
 
       <nav className="flex-1 p-4 space-y-1">

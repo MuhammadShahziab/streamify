@@ -5,6 +5,7 @@ import { LogIn, ShipWheelIcon } from "lucide-react";
 import type { LoginData } from "../types";
 import { useLogin } from "../hooks/useAuthUser";
 import Button from "../components/Button";
+import GradientText from "../components/GradientText";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState<LoginData>({
@@ -22,11 +23,8 @@ const LoginPage = () => {
     <div className="flex h-screen items-center justify-center p-4 sm:p-6 md:p-8">
       <div className="flex w-full max-w-4xl flex-col-reverse overflow-hidden rounded-xl border border-primary/25 bg-base-100 shadow-lg lg:flex-row">
         <div className="w-full p-6 sm:p-8 lg:w-1/2">
-          <div className="mb-6 flex items-center gap-2">
-            <ShipWheelIcon className="size-9 text-primary animate-spin" />
-            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text font-mono text-3xl font-bold tracking-wider text-transparent">
-              Streamify
-            </span>
+          <div className="mb-6 ">
+          <GradientText icon={ShipWheelIcon} to="/" spin title="Streamify" />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
