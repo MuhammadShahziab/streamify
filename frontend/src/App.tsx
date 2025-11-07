@@ -15,6 +15,7 @@ import FriendsPage from "./pages/FriendsPage";
 import ChatPage from "./pages/ChatPage";
 import 'stream-chat-react/dist/css/v2/index.css';
 import CallPage from "./pages/CallPage";
+import { SocketClient } from "./lib/socket";
 
 const App = () => {
   const { authUser, isLoading } = useAuthUser();
@@ -36,6 +37,9 @@ const App = () => {
         verificationMeta ||
         (localUser && localUser.isVerified === false)
     );
+
+// Call Socket.io connection
+SocketClient(authUser?._id || "", isVerified || false);
 
   if (isLoading) {
     return <LoadingOverLay></LoadingOverLay>;

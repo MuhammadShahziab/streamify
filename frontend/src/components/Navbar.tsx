@@ -4,7 +4,6 @@ import { useAuthUser, useLogout } from "../hooks/useAuthUser";
 import ThemeSelector from "./ThemeSelector";
 import Button from "./Button";
 import GradientText from "./GradientText";
-import { MusicIcon } from "lucide-react";
 
 const Navbar = () => {
   const { authUser } = useAuthUser();

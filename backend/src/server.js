@@ -6,7 +6,8 @@ import userRoutes from "./routes/user.route.js";
 import chatRoutes from "./routes/chat.route.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-const app = express();
+import {app , server} from "./socket/socketio.js";
+// const app = express();
 app.use(express.json());
 dotenv.config();
 const PORT = process.env.PORT || 5000;
@@ -22,7 +23,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/chat", chatRoutes)
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   connectDB();
 });

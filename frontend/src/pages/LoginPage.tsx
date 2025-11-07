@@ -93,7 +93,7 @@ const LoginPage = () => {
           </form>
         </div>
 
-        <div className="flex w-full items-center justify-center bg-primary/10 p-8 lg:w-1/2">
+        <div className="hidden lg:flex w-full items-center justify-center bg-primary/10 p-8 lg:w-1/2">
           <div className="max-w-md space-y-4 text-center">
               <img
                 src="/Video_call.svg"
