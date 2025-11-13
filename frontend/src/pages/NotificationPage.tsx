@@ -1,5 +1,10 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { acceptFriendRequest, getFriendRequests } from "../lib/api";
+import {
+  acceptFriendRequest,
+  getNotifications,
+  markNotificationsAsRead,
+} from "../lib/api";
 import LoadingOverLay from "../components/LoadingOverLay";
 import {
   BellIcon,
@@ -10,50 +15,100 @@ import {
 import Button from "../components/Button";
 import { getLanguageFlag } from "../utils/getLanguageFlag";
 import NotUserFound from "../components/NotUserFound";
+import { useNotificationStore } from "../store/useNotificationStore";
+import Container from "../components/Container";
 
 const NotificationPage = () => {
   const queryClient = useQueryClient();
-  const { data: friendRequests, isLoading } = useQuery({
-    queryKey: ["friendRequests"],
-    queryFn: getFriendRequests,
+  const notifications = useNotificationStore((state) => state.notifications);
+  const setNotifications = useNotificationStore(
+    (state) => state.setNotifications
+  );
+  const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
+
+  const { isLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: getNotifications,
+    onSuccess: (data) => {
+      setNotifications(data.notifications);
+    },
   });
 
   const { mutate: acceptRequestMutation, isPending } = useMutation({
     mutationFn: acceptFriendRequest,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
+    onSuccess: async (_, requestId) => {
+      // Refetch updated notifications
+      const updatedData = await queryClient.fetchQuery({
+        queryKey: ["notifications"],
+        queryFn: getNotifications,
+      });
+
+      // Remove the accepted one locally (optional)
+      const filtered = updatedData.notifications.filter(
+        (notification) => notification.friendRequest?._id !== requestId
+      );
+
+      // ✅ Set the final array
+      setNotifications(filtered);
+
+      // Also refetch friends list
       queryClient.invalidateQueries({ queryKey: ["friends"] });
     },
   });
 
-  const incomingRequests = friendRequests?.incomingReqs || [];
-  const acceptedRequests = friendRequests?.acceptedReqs || [];
-  console.log(incomingRequests, acceptedRequests, "check acceptedRequests");
+  const { mutate: markNotificationsReadMutation } = useMutation({
+    mutationFn: markNotificationsAsRead,
+    onSuccess: (data) => {
+      setNotifications(data.notifications);
+    },
+  });
+
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    const hasUnread = notifications.some(
+      (notification) => !notification.isRead
+    );
+    if (hasUnread) {
+      markAllAsRead();
+      markNotificationsReadMutation();
+    }
+  }, [notifications, markAllAsRead, markNotificationsReadMutation]);
+
+    const incomingRequests = notifications.filter(
+    (notification) =>
+      notification.type === "friend_request" &&
+      notification.friendRequest?.status === "pending"
+  );
+    const acceptedRequests = notifications.filter(
+    (notification) => notification.type === "friend_request_accepted"
+  );
 
   if (isLoading) {
     return <LoadingOverLay />;
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="container mx-auto max-w-4xl space-y-8">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
-          Notifications
-        </h1>
-        {incomingRequests.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <UserCheckIcon className="h-5 w-5 text-primary" />
-              Friend Requests
-              <span className="badge badge-primary ml-2">
-                {incomingRequests.length}
-              </span>
-            </h2>
+    <Container>
+      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
+        Notifications
+      </h1>
+      {incomingRequests.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <UserCheckIcon className="h-5 w-5 text-primary" />
+            Friend Requests
+            <span className="badge badge-primary ml-2">
+              {incomingRequests.length}
+            </span>
+          </h2>
 
-            <div className="space-y-3">
-              {incomingRequests.map((request) => (
+          <div className="space-y-3">
+            {incomingRequests.map((notification) => {
+              const friendRequest = notification.friendRequest;
+              const sender = friendRequest?.sender;
+              return (
                 <div
-                  key={request._id}
+                  key={notification._id}
                   className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="card-body p-4">
@@ -61,29 +116,30 @@ const NotificationPage = () => {
                       <div className="flex items-center gap-3">
                         <div className="avatar w-14 h-14 rounded-full bg-base-300">
                           <img
-                            src={request.sender.profilePic}
-                            alt={request.sender.fullName}
+                            src={sender?.profilePic}
+                            alt={sender?.fullName}
                           />
                         </div>
                         <div>
-                          <h3 className="font-semibold">
-                            {request.sender.fullName}
-                          </h3>
+                          <h3 className="font-semibold">{sender?.fullName}</h3>
                           <div className="flex flex-wrap gap-1.5 mt-1">
-                            <span className="badge badge-secondary badge-lg py-2 flex gap-x-2">
-                              Native:{" "}
-                              {getLanguageFlag(request.sender.nativeLanguage)}
+                            <span className="badge badge-secondary badge-lg py-2 flex items-center text-sm gap-x-2 ">
+                              Native: {getLanguageFlag(sender?.nativeLanguage)}
                             </span>
-                            <span className="badge badge-outline badge-lg py-2 flex gap-x-2">
+                            <span className="badge badge-outline badge-lg py-2 flex items-center text-sm gap-x-2">
                               Learning:{" "}
-                              {getLanguageFlag(request.sender.learningLanguage)}
+                              {getLanguageFlag(sender?.learningLanguage)}
                             </span>
                           </div>
                         </div>
                       </div>
                       <Button
                         loading={isPending}
-                        onClick={() => acceptRequestMutation(request._id)}
+                        onClick={() => {
+                          if (friendRequest?._id) {
+                            acceptRequestMutation(friendRequest._id);
+                          }
+                        }}
                         className="w-32"
                         size="sm"
                       >
@@ -92,19 +148,22 @@ const NotificationPage = () => {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
-        {acceptedRequests.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <BellIcon className="h-5 w-5 text-success" />
-              New Connections
-            </h2>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {acceptedRequests.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <BellIcon className="h-5 w-5 text-success" />
+            New Connections
+          </h2>
 
-            <div className="space-y-3">
-              {acceptedRequests.map((notification) => (
+          <div className="space-y-3">
+            {acceptedRequests.map((notification) => {
+              const recipient = notification.friendRequest?.recipient;
+              return (
                 <div
                   key={notification._id}
                   className="card bg-base-200 shadow-sm"
@@ -113,17 +172,15 @@ const NotificationPage = () => {
                     <div className="flex items-start gap-3">
                       <div className="avatar mt-1 size-10 rounded-full">
                         <img
-                          src={notification.recipient.profilePic}
-                          alt={notification.recipient.fullName}
+                          src={recipient?.profilePic}
+                          alt={recipient?.fullName}
                         />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold">
-                          {notification.recipient.fullName}
-                        </h3>
+                        <h3 className="font-semibold">{recipient?.fullName}</h3>
                         <p className="text-sm my-1">
                           <span className="font-bold text-primary">
-                            {notification.recipient.fullName}
+                            {recipient?.fullName}
                           </span>{" "}
                           accepted your friend request
                         </p>
@@ -132,9 +189,9 @@ const NotificationPage = () => {
                           {new Date(notification.createdAt).toLocaleString(
                             "en-US",
                             {
-                              month: "short", // "Jan", "Feb", ...
-                              day: "numeric", // 1–31
-                              year: "numeric", // 2025
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
                               hour: "2-digit",
                               minute: "2-digit",
                             }
@@ -148,18 +205,18 @@ const NotificationPage = () => {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
-        {incomingRequests.length === 0 && acceptedRequests.length === 0 && (
-          <NotUserFound
-            title="No notifications yet"
-            desc="When you receive friend requests or messages, they'll appear here."
-          />
-        )}
-      </div>
-    </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {incomingRequests.length === 0 && acceptedRequests.length === 0 && (
+        <NotUserFound
+          title="No notifications yet"
+          desc="When you receive friend requests or messages, they'll appear here."
+        />
+      )}
+    </Container>
   );
 };
 

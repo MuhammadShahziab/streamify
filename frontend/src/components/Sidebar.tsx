@@ -1,13 +1,20 @@
-import { BellIcon, HomeIcon, ShipWheelIcon, UsersIcon } from "lucide-react";
+import { BellIcon, HomeIcon, ShipWheelIcon, UserIcon, UsersIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useAuthUser } from "../hooks/useAuthUser";
 import GradientText from "./GradientText";
-
+import { useNotificationStore } from "../store/useNotificationStore";
+import clsx from "clsx";
 const Sidebar = () => {
   const { authUser } = useAuthUser();
 
   const location = useLocation();
   const currentPath = location.pathname;
+  const notifications = useNotificationStore((state) => state.notifications);
+  const hasUnReadNotifications = notifications.some(
+    (notification) => !notification.isRead
+  );
+  const shouldAnimateBell =
+    hasUnReadNotifications && currentPath !== "/notifications";
   return (
     <aside className="w-64 bg-base-200  border-base-300 hidden lg:flex flex-col h-screen sticky top-0">
       <div className="p-5 ">
@@ -35,12 +42,29 @@ const Sidebar = () => {
         </Link>
         <Link
           to="/notifications"
-          className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+          className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case relative ${
             currentPath === "/notifications" ? "btn-active" : ""
           }`}
         >
-          <BellIcon className="size-5 text-base-content opacity-70" />
+          {shouldAnimateBell && (
+            <span className="w-1 h-1 rounded-full bg-red-600 absolute top-3 left-2 animate-ping " />
+          )}
+          <BellIcon
+            className={clsx(
+              "size-5 text-base-content opacity-70",
+              shouldAnimateBell && "bell-shake"
+            )}
+          />
           <span>Notifications</span>
+        </Link>
+        <Link
+          to="/profile"
+          className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+            currentPath === "/profile" ? "btn-active" : ""
+          }`}
+        >
+          <UserIcon className="size-5 text-base-content opacity-70" />
+          <span>Profile</span>
         </Link>
       </nav>
       <div className="p-4 border-t border-base-300 mt-auto">

@@ -16,6 +16,7 @@ import ChatPage from "./pages/ChatPage";
 import 'stream-chat-react/dist/css/v2/index.css';
 import CallPage from "./pages/CallPage";
 import { SocketClient } from "./lib/socket";
+import ProfilePage from "./pages/ProfilePage";
 
 const App = () => {
   const { authUser, isLoading } = useAuthUser();
@@ -79,6 +80,18 @@ SocketClient(authUser?._id || "", isVerified || false);
             )
           }
         ></Route>
+         <Route
+          path="/verify-otp"
+          element={
+            hasPendingVerification ? (
+              <OtpPage />
+            ) : isAuthenticated ? (
+              <Navigate to={isOnBoarded ? "/" : "/onboarding"} replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        ></Route>
         <Route
           path="/onboarding"
           element={
@@ -88,6 +101,18 @@ SocketClient(authUser?._id || "", isVerified || false);
               ) : (
                 <Navigate to="/" />
               )
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        ></Route>
+         <Route
+          path="/profile"
+          element={
+           isAuthenticated && isOnBoarded ? (
+              <Layout showSidebar={true}>
+                <ProfilePage />
+              </Layout>
             ) : (
               <Navigate to="/login" />
             )
@@ -141,18 +166,7 @@ SocketClient(authUser?._id || "", isVerified || false);
             )
           }
         ></Route>
-        <Route
-          path="/verify-otp"
-          element={
-            hasPendingVerification ? (
-              <OtpPage />
-            ) : isAuthenticated ? (
-              <Navigate to={isOnBoarded ? "/" : "/onboarding"} replace />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        ></Route>
+       
       </Routes>
       <Toaster />
     </div>

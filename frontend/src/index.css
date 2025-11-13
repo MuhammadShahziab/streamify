@@ -31,3 +31,29 @@
 .str-chat__message-input {
   border-top: 1px solid #ddd;
 }
+
+@keyframes bell-shake {
+  0% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-15deg);
+  }
+  40% {
+    transform: rotate(10deg);
+  }
+  60% {
+    transform: rotate(-10deg);
+  }
+  80% {
+    transform: rotate(6deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.bell-shake {
+  animation: bell-shake 0.9s ease-in-out infinite;
+  transform-origin: top center;
+}

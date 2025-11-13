@@ -1,5 +1,35 @@
 import FriendRequest from "../models/FriendRequest.js";
+import Notification from "../models/Notification.js";
 import User from "../models/User.js";
+import { getReceverSocketId, io } from "../socket/socketio.js";
+
+const USER_NOTIFICATION_FIELDS =
+  "fullName profilePic bio nativeLanguage learningLanguage";
+
+const notificationPopulateConfig = {
+  path: "friendRequest",
+  populate: [
+    { path: "sender", select: USER_NOTIFICATION_FIELDS },
+    { path: "recipient", select: USER_NOTIFICATION_FIELDS },
+  ],
+};
+
+const buildNotificationPayload = async (notificationId) => {
+  if (!notificationId) return null;
+  return Notification.findById(notificationId)
+    .populate(notificationPopulateConfig)
+    .lean();
+};
+
+const emitRealtimeNotification = async (userId, notificationId) => {
+  const receiverSocketId = getReceverSocketId(userId?.toString());
+  if (!receiverSocketId) return;
+
+  const notification = await buildNotificationPayload(notificationId);
+  if (notification) {
+    io.to(receiverSocketId).emit("notification:new", notification);
+  }
+};
 
 export const getRecommendedUsers = async (req, res) => {
   try {
@@ -67,7 +97,13 @@ export const sendFriendRequest = async (req, res) => {
       recipient: recipientId,
     });
 
-    await createNewReq.save();
+    const notification = await Notification.create({
+      user: recipientId,
+      friendRequest: createNewReq._id,
+      type: "friend_request",
+    });
+
+    await emitRealtimeNotification(recipientId, notification._id);
     res.status(200).json({ message: "Friend request sent successfully" });
   } catch (error) {
     console.log("Error in sendFriendRequest controller", error);
@@ -113,6 +149,13 @@ export const acceptFriendRequest = async (req, res) => {
       },
       { new: true }
     );
+
+    const notification = await Notification.create({
+      user: friendRequest.sender,
+      friendRequest: friendRequest._id,
+      type: "friend_request_accepted",
+    });
+    await emitRealtimeNotification(friendRequest.sender, notification._id);
 
     return res
       .status(200)
@@ -168,7 +211,7 @@ export const getFriendRequests = async (req, res) => {
   }
 };
 
-export const getOutGoingFriendReqs = async (req,res) => {
+export const getOutGoingFriendReqs = async (req, res) => {
   try {
     const userId = req.user._id;
     const outgoingRequests = await FriendRequest.find({
@@ -182,5 +225,38 @@ export const getOutGoingFriendReqs = async (req,res) => {
   } catch (error) {
     console.log("Error in getOutgoingFriendReqs controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const getNotifications = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const notifications = await Notification.find({ user: userId })
+      .populate(notificationPopulateConfig)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ notifications });
+  } catch (error) {
+    console.log("Error in getNotifications controller", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const markNotificationsAsRead = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    await Notification.updateMany(
+      { user: userId, isRead: false },
+      { $set: { isRead: true } }
+    );
+
+    const notifications = await Notification.find({ user: userId })
+      .populate(notificationPopulateConfig)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ notifications });
+  } catch (error) {
+    console.log("Error in markNotificationsAsRead controller", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

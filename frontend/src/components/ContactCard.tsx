@@ -56,7 +56,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
       </>
     );
   };
-console.log(onlineUsers,"check online users")
+
   return (
     <div className="card bg-base-200  hover:shadow-md transition-shadow">
       <div className="card-body p-4 relative">
@@ -87,7 +87,7 @@ console.log(onlineUsers,"check online users")
             Learning: {user?.learningLanguage}
           </span>
         </div>
-        <div className="mb-3">{user.bio && <span>{user?.bio}</span>}</div>
+        <div className="mb-3">{user.bio && <span className="text-sm">{user?.bio}</span>}</div>
         {/* CONTACT BUTTON */}
         <div>
           <button

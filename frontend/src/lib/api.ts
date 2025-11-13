@@ -3,6 +3,7 @@ import {
   type GetAuthUserResponse,
   type LoginData,
   type LoginResponse,
+  type NotificationsResponse,
   type OnboardingData,
   type RecomendedUsersResponse,
   type ResendOtpResponse,
@@ -84,10 +85,18 @@ export const sendFriendReq = async (id:string)=>{
   return data;
 }
 
-export const getFriendRequests = async ()=>{
-  const {data} = await axiosInstance.get("/user/friend-requests");
-  return data
-}
+export const getNotifications = async () => {
+  const { data } = await axiosInstance.get<NotificationsResponse>(
+    "/user/notifications"
+  );
+  return data;
+};
+export const markNotificationsAsRead = async () => {
+  const { data } = await axiosInstance.post<NotificationsResponse>(
+    "/user/notifications/mark-read"
+  );
+  return data;
+};
 export const acceptFriendRequest = async (id:string)=>{
   const {data} = await axiosInstance.post(`/user/friend-request/${id}/accept`);
   return data;

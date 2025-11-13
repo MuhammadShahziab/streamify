@@ -130,9 +130,8 @@ const OtpPage = () => {
   return (
     <div
       className="h-screen flex items-center justify-center p-4 sm:p-6 md:p-8"
-      data-theme="night"
     >
-      <div className="card w-full max-w-3xl bg-base-200 shadow-xl">
+      <div className="card rounded-md w-full max-w-3xl bg-base-200 shadow-xl">
         <div className="card-body p-6 sm:p-8">
           <div className="flex flex-col items-center gap-2 mb-6 text-center">
             <Mail className="size-20 text-primary" />
