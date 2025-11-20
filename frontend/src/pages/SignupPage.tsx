@@ -58,7 +58,7 @@ const SignupPage = () => {
                     </label>
                     <input
                       type="email"
-                      placeholder="JohnDoe@gmail"
+                      placeholder="JohnDoe@gmail.com"
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
@@ -73,6 +73,8 @@ const SignupPage = () => {
                       <span className="label-text">Pasword</span>
                     </label>
                     <input
+                      name="password"
+                      data-testid="password-input"
                       type="password"
                       placeholder="********"
                       value={formData.password}

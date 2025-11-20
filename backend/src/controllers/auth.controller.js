@@ -138,6 +138,12 @@ export const signUp = async (req, res) => {
     if (!fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
+    
+    if (fullName.length < 3) {
+      return res
+        .status(400)
+        .json({ message: "Full name must be at least 3 characters long" });
+    }
 
     if (password.length < 6) {
       return res

@@ -114,6 +114,7 @@ export const useSignUp = () => {
     onMutate: async (variables) => ({ email: variables.email }),
     onSuccess: (data) => {
       setUser(data.user);
+      console.log("Signup successful:", data);
       setIsAuthenticated(false);
       handleVerificationEnvelope(data, {
         setVerificationFromEnvelope,
